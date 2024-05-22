@@ -1,0 +1,183 @@
+﻿[
+  {
+    "name": "ALLEGIANT",
+    "iata_code": "G4",
+    "icao_code": "AAY",
+    "ticket_counter_opens_hours_prior_departure": "2",
+    "ticket_counter_closes_hours_prior_departure": "2",
+    "is_problem": "true",
+    "common_problems": [
+      {
+        "description": "MISSING LUGGAGE",
+        "solution": "1.PERFORM PAGE FOR STAFF 2.INSTRUCT PAX TO CONTACT AIRLINE CS NUMBER 3.INSTRUCT PAX NEEDS RETURN NEXT DEPARTING FLIGHT WHEN STAFF WILL BE AVAILABLE"
+      },
+      {
+        "description": "MISSING CARSEAT",
+        "solution": "1.PERFORM PAGE FOR STAFF 2.INSTRUCT PAX TO CONTACT AIRLINE CS NUMBER 3.INSTRUCT PAX NEEDS RETURN NEXT DEPARTING FLIGHT WHEN STAFF WILL BE AVAILABLE. PAX NEEDS TO TAKE A TAXI THAT WILL PROVIDE ONE OR HAVE SOMEONE BUY THEM A NEW CARSEAT AND BRING TO AIRPORT"
+      }
+    ]
+  },
+  {
+    "name": "AMERICAN",
+    "iata_code": "AA",
+    "icao_code": "AAL"
+  },
+  {
+    "name": "AIR CANADA",
+    "iata_code": "AC",
+    "icao_code": "ACA"
+  },
+  {
+    "name": "AIR CANADA ROUGE",
+    "iata_code": "RV",
+    "icao_code": "ROU"
+  },
+  {
+    "name": "ALASKA",
+    "iata_code": "AS",
+    "icao_code": "ASA"
+  },
+  {
+    "name": "AVELO",
+    "iata_code": "XP",
+    "icao_code": "VXP",
+    "ticket_counter_opens_hours_prior_departure": "2",
+    "ticket_counter_closes_hours_prior_departure": "2",
+    "common_problems": [
+      {
+        "description": "MISSING LUGGAGE",
+        "solution": "1.PERFORM PAGE FOR STAFF 2.INSTRUCT PAX TO CONTACT AIRLINE CS LINE 3.INSTRUCT PAX NEEDS RETURN NEXT DEPARTING FLIGHT WHEN STAFF WILL BE AVAILABLE"
+      }
+    ]
+  },
+  {
+    "name": "BRITISH",
+    "iata_code": "BA",
+    "icao_code": "BAW"
+  },
+  {
+    "name": "CONTOUR",
+    "iata_code": "LF",
+    "icao_code": "VTE",
+    "ticket_counter_opens_hours_prior_departure": "2",
+    "ticket_counter_closes_hours_prior_departure": "2",
+    "common_problems": [
+      {
+        "description": "LUGGAGE WAS SUPPOSED TO BE TRANSFERED TO CONNECTING AA FLIGHT WHILE IN NASHVILLE, BUT DIDN'T MAKE IT TO FINAL DESTINATION'",
+        "solution": "1.CHECK LOST AND FOUND ENTRIES - IF WE HAVE IT, TAKE IT TO AA BSO 2.INSTRUCT PAX TO CONTACT AA BSO OR CONTOUR CS LINE"
+      }
+    ]
+  },
+  {
+    "name": "DELTA",
+    "iata_code": "DL",
+    "icao_code": "DAL"
+  },
+  {
+    "name": "ENDEAVOR",
+    "iata_code": "9E",
+    "icao_code": "EDV"
+  },
+  {
+    "name": "ENVOY",
+    "iata_code": "MQ",
+    "icao_code": "ENY"
+  },
+  {
+    "name": "FRONTIER",
+    "iata_code": "F9",
+    "icao_code": "FF9",
+    "ticket_counter_opens_hours_prior_departure": "2",
+    "ticket_counter_closes_hours_prior_departure": "2",
+    "common_problems": [
+      {
+        "description": "PAX SAY NO STAFF AT TICKET COUNTER FOR CHECKIN.",
+        "solution": "INSTRUCT PAX NEED TO WAIT EXACTLY 2 HOURS PRIOR TO DEPARTURE FOR STAFF TO ARRIVE AT COUNTER."
+      }
+    ]
+  },
+  {
+    "name": "FLAIR",
+    "iata_code": "F8",
+    "icao_code": "FLE",
+    "ticket_counter_opens_hours_prior_departure": "2",
+    "ticket_counter_closes_hours_prior_departure": "2",
+    "common_problems": [
+      {
+        "description": "MISSING LUGGAGE.",
+        "solution": ""
+      }
+    ]
+  },
+  {
+    "name": "JETBLUE",
+    "iata_code": "B6",
+    "icao_code": "JBU"
+  },
+  {
+    "name": "MESA",
+    "iata_code": "YV",
+    "icao_code": "ASH"
+  },
+  {
+    "name": "PSA",
+    "iata_code": "OH",
+    "icao_code": "JIA"
+  },
+  {
+    "name": "REPUBLIC",
+    "iata_code": "YX",
+    "icao_code": "RPA"
+  },
+  {
+    "name": "SPIRIT",
+    "iata_code": "NK",
+    "icao_code": "NKS"
+  },
+  {
+    "name": "SUN COUNTRY",
+    "iata_code": "SY",
+    "icao_code": "SCX",
+    "ticket_counter_opens_hours_prior_departure": "2",
+    "ticket_counter_closes_hours_prior_departure": "2",
+    "common_problems": [
+      {
+        "description": "PAX LIKE TO EAT AT RESTAURANTS BEFORE PROCEEDING TO BAGGAGE CLAIM AND ARE NOW MISSING LUGGAGE",
+        "solution": "1.PERFORM PAGE FOR STAFF 2.INSTRUCT PAX TO CONTACT AIRLINE CS NUMBER 3.INSTRUCT PAX NEEDS TO RETURN NEXT DEPARTING FLIGHT WHEN STAFF WILL BE AVAILABLE"
+      }
+    ]
+  },
+  {
+    "name": "SKYWEST",
+    "iata_code": "OO",
+    "icao_code": "SKW"
+  },
+  {
+    "name": "SOUTHWEST",
+    "iata_code": "WN",
+    "icao_code": "SWA"
+  },
+  {
+    "name": "UNITED",
+    "iata_code": "UA",
+    "icao_code": "UAL"
+  },
+  {
+    "name": "VIVA AEROBUS",
+    "iata_code": "VB",
+    "icao_code": "VIV"
+  },
+  {
+    "name": "WESTJET",
+    "iata_code": "WS",
+    "icao_code": "WJA",
+    "ticket_counter_opens_hours_prior_departure": "2",
+    "ticket_counter_closes_hours_prior_departure": "2",
+    "common_problems": [
+      {
+        "description": "PAX IS LATE AND TICKET COUNTER IS CLOSED",
+        "solution": "1.PERFORM PAGE FOR STAFF TO MEET PAX AT TICKET COUNTER ONCE FLIGHT HAS DEPARTED"
+      }
+    ]
+  }
+]
