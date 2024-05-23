@@ -13,10 +13,10 @@ namespace FASTTAPI.Utility
 
                 _sqlConnectionStringBuilder.Encrypt = true;
 
-                _sqlConnectionStringBuilder.DataSource = config["FASTTAPIAPIDatabaseConnection_Server"];
-                _sqlConnectionStringBuilder.UserID = config["FASTTAPIAPIDatabaseConnection_Username"];
-                _sqlConnectionStringBuilder.Password = config["FASTTAPIAPIDatabaseConnection_Password"];
-                _sqlConnectionStringBuilder.InitialCatalog = config["FASTTAPIAPIDatabaseConnection_Database"];
+                _sqlConnectionStringBuilder.DataSource = config["FASTTDatabaseConnection_Server"];
+                _sqlConnectionStringBuilder.UserID = config["FASTTDatabaseConnection_Username"];
+                _sqlConnectionStringBuilder.Password = config["FASTTDatabaseConnection_Password"];
+                _sqlConnectionStringBuilder.InitialCatalog = config["FASTTDatabaseConnection_Database"];
             }
 
             return _sqlConnectionStringBuilder.ToString();

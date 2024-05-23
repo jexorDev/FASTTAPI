@@ -64,7 +64,7 @@ namespace FASTTAPI.Controllers
                 {
                     connection.Open();
 
-                    foreach (var flight in _flightSqlRepository.GetFlights(connection, parameters?.DispositionType ?? Disposition.Type.None, parameters.DateTimeFrom, parameters.DateTimeTo, (airline?.IataCode ?? ""), parameters.Airport ?? "", false))
+                    foreach (var flight in _flightSqlRepository.GetFlights(connection, parameters?.DispositionType ?? Disposition.Type.None, parameters.DateTimeFrom, parameters.DateTimeTo, "", airline?.IataCode ?? "", parameters.Airport ?? "", false))
                     {
                         //TODO: make shared code for this
                         var flightModel = new BaseAirportFlightModel

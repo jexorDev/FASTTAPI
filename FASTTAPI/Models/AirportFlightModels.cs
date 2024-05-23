@@ -12,6 +12,7 @@
         public string Status { get; set; } = string.Empty;
         public string AirlineIdentifier { get; set; } = string.Empty;
         public string AirlineName { get; set; } = string.Empty;
+        public List<string> CodesharePartners { get; set; } = new List<string>();
         public string FlightNumber { get; set; } = string.Empty;
         public string AirportGate { get; set; } = string.Empty;
         public DateTime? ScheduledDepartureTime { get; set; }
@@ -23,6 +24,7 @@
         public string CityCode { get; set; } = string.Empty;    
         public string CityName { get; set; } = string.Empty;
         public string CityAirportName { get; set; } = string.Empty;
+        public DateTime LastUpdated { get; set; }
 
     }
 

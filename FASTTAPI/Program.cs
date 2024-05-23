@@ -17,11 +17,11 @@ builder.Services.AddCors(options =>
 
         if (!string.IsNullOrWhiteSpace(prodSiteUrl))
         {
-            policy.WithOrigins(prodSiteUrl).WithMethods("GET");
+            policy.WithOrigins(prodSiteUrl).WithMethods("GET", "POST").WithHeaders("*");
         }
         if (!string.IsNullOrWhiteSpace(devSiteUrl))
         {
-            policy.WithOrigins(devSiteUrl).WithMethods("GET");
+            policy.WithOrigins(devSiteUrl).WithMethods("GET", "POST").WithHeaders("*");
         }
     });
 });

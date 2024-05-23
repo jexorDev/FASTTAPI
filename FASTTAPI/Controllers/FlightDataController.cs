@@ -11,25 +11,26 @@ using Newtonsoft.Json;
 namespace FASTTAPI.Controllers
 {
     [ApiController]
-    [Route("RawFlightData")]
-    public class RawFlightDataController : ControllerBase
+    [Route("FlightData")]
+    public class FlightDataController : ControllerBase
     {
-        
         private readonly IConfiguration _configuration;
-        private readonly ILogger<RawFlightDataController> _logger;
+        private readonly ILogger<FlightDataController> _logger;
         private readonly FlightsSqlRepository _flightSqlRepository;
+        private readonly FlightCodesharePartnerSqlRepository _flightCodesharePartnerSqlRepository;
 
-        public RawFlightDataController(ILogger<RawFlightDataController> logger, IConfiguration config)
+        public FlightDataController(ILogger<FlightDataController> logger, IConfiguration config)
         {
             _configuration = config;
             _logger = logger;
             _flightSqlRepository = new FlightsSqlRepository();
+            _flightCodesharePartnerSqlRepository = new FlightCodesharePartnerSqlRepository();
         }
 
         [HttpGet]
-        public async Task<List<BaseAirportFlightModel>> Get([FromQuery] Disposition.Type dispositionType, DateTime fromDateTime, DateTime toDateTime, string? airline, string? city, bool? includeCodesharePartners)
+        public async Task<List<BaseAirportFlightModel>> Get([FromQuery] Disposition.Type dispositionType, DateTime fromDateTime, DateTime toDateTime, string? flightNumber, string? airline, string? city, bool? includeCodesharePartners)
         {
-            Utility.AirlineRegistry.GetAirlines();
+            AirlineRegistry.GetAirlines();
             var flights = new List<BaseAirportFlightModel>();
 
             var airlineCode = string.Empty;
@@ -47,12 +48,16 @@ namespace FASTTAPI.Controllers
             {
                 connection.Open();
 
-                foreach (var flight in _flightSqlRepository.GetFlights(connection, dispositionType, fromDateTime, toDateTime, airlineCode, city ?? "", includeCodesharePartners ?? false))
+                foreach (var flight in _flightSqlRepository.GetFlights(connection, dispositionType, fromDateTime, toDateTime, flightNumber ?? "", airlineCode, city ?? "", includeCodesharePartners ?? false))
                 {
+                    var codesharePartners = _flightCodesharePartnerSqlRepository.GetCodesharePartners(flight.Pk, connection);
+                    var convertedCodesharePartners = codesharePartners.Distinct().Select(partner => AirlineRegistry.FindAirline(partner));
+
                     //TODO: make shared code for this
                     var flightModel = new BaseAirportFlightModel
                     {
                         FlightNumber = flight.FlightNumber,
+                        CodesharePartners = convertedCodesharePartners.Where(partner => partner != null).Select(partner => partner.Name).ToList(),
                         AirportGate = flight.Gate,
                         ScheduledArrivalTime = flight.DateTimeScheduled,
                         ScheduledDepartureTime = flight.DateTimeScheduled,
@@ -62,7 +67,8 @@ namespace FASTTAPI.Controllers
                         ActualDepartureTime = flight.DateTimeActual,
                         CityName = flight.CityName,
                         CityCode = flight.CityAirportCode,
-                        CityAirportName = flight.CityAirportName
+                        CityAirportName = flight.CityAirportName,
+                        LastUpdated = (flight.DateTimeModified ?? flight.DateTimeCreated).ToLocalTime()
                     };
 
                     var flightAirline = AirlineRegistry.FindAirline(flight.Airline);
@@ -89,81 +95,92 @@ namespace FASTTAPI.Controllers
         }
 
         [HttpPost]
-        public async Task<string> Populate(
-            string adminPassword,
-            bool forToday, 
-            bool forTomorrow, 
-            bool arrived, 
-            bool scheduledArrivals, 
-            bool departed, 
-            bool scheduledDeparted)
+        public async Task<string> Populate([FromBody] PostFlightDataBody body)
         {
-            if (string.Compare(adminPassword, _configuration["AdminPassword"].ToString(), false) != 0) return "Invalid password";
+            if (string.Compare(body.AdminPassword, _configuration["AdminPassword"].ToString(), false) != 0) return "Invalid password";
 
-            var status = "";
+            var status = "connecting to database";
 
-            try
+            using (SqlConnection connection = new SqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
             {
-                using (SqlConnection connection = new SqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
+                SqlTransaction transaction = null;
+
+                try
                 {
+                    var needToWait = false;
                     connection.Open();
 
                     DateTime fromDateTime = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0).ToUniversalTime();
-                    DateTime toDateTime = fromDateTime.AddHours(24).AddSeconds(-1);
-
-                    if (forToday)
+                    DateTime toDateTime = fromDateTime.AddHours(24).AddSeconds(-1);                   
+                                        
+                    if (body.ForTomorrow)
                     {
-                        status = "populating tables for today";
-                        await PopulateFlightTables(fromDateTime, toDateTime, arrived, scheduledArrivals, departed, scheduledDeparted, connection);
-                    }
-
-                    if (forTomorrow)
-                    {
-                        status = "populating tables for tomorrow";
-
                         fromDateTime = fromDateTime.AddDays(1); 
                         toDateTime = toDateTime.AddDays(1);
-
-                        await PopulateFlightTables(fromDateTime, toDateTime, arrived, scheduledArrivals, departed, scheduledDeparted, connection);
                     }
 
+                    if (body.Arrived)
+                    {
+                        status = "populating tables with arrived flights";
+                        if (needToWait) Thread.Sleep(60000);                   
+                        transaction = connection.BeginTransaction();
+                        await PopulateFlightTable(fromDateTime, toDateTime, "arrivals", connection, transaction);
+                        transaction.Commit();
+                        needToWait = true;
+                    }
+                    if (body.ScheduledArriving)
+                    {
+                        status = "populating tables with scheduled arriving flights";
+                        if (needToWait) Thread.Sleep(60000);
+                        transaction = connection.BeginTransaction();
+                        await PopulateFlightTable(fromDateTime, toDateTime, "scheduled_arrivals", connection, transaction);
+                        transaction.Commit();
+                        needToWait = true;
+                    }
+                    if (body.Departed)
+                    {
+                        status = "populating tables with departed flights";
+                        if (needToWait) Thread.Sleep(60000);
+                        Thread.Sleep(60000);
+                        transaction = connection.BeginTransaction();
+                        await PopulateFlightTable(fromDateTime, toDateTime, "departures", connection, transaction);
+                        transaction.Commit();
+                        needToWait = true;
+                    }
+                    if (body.ScheduledArriving)
+                    {
+                        status = "populating tables with scheduled departing flights";
+                        if (needToWait) Thread.Sleep(60000);
+                        Thread.Sleep(60000);
+                        transaction = connection.BeginTransaction();
+                        await PopulateFlightTable(fromDateTime, toDateTime, "scheduled_departures", connection, transaction);
+                        transaction.Commit();
+                        needToWait = true;
+                    }
+
+                    status = "Successfully completed populating tables";
+
+                }
+                catch (Exception ex)
+                {
+                    if (transaction != null) transaction.Rollback();
+                    status = $"ERROR while {status}: {ex.Message}";
+                }
+                finally
+                {
                     connection.Close();
                 }
-
-                status = "Successfully completed populating tables";
-
-            }
-            catch (Exception ex)
-            {
-                status = $"ERROR while {status}: {ex.Message}";
             }
 
             return status;
-        }
-
-        private async Task PopulateFlightTables(
-            DateTime fromDateTime, 
-            DateTime toDateTime, 
-            bool arrived, 
-            bool scheduledArrivals, 
-            bool departed, 
-            bool scheduledDeparted,
-            SqlConnection connection)
-        {
-            await PopulateFlightTable(fromDateTime, toDateTime, "arrivals", connection);
-            Thread.Sleep(60000);
-            await PopulateFlightTable(fromDateTime, toDateTime, "scheduled_arrivals", connection);
-            Thread.Sleep(60000);
-            await PopulateFlightTable(fromDateTime, toDateTime, "departures", connection);
-            Thread.Sleep(60000);
-            await PopulateFlightTable(fromDateTime, toDateTime, "scheduled_departures", connection);
         }
 
         private async Task PopulateFlightTable(
             DateTime fromDateTime, 
             DateTime toDateTime, 
             string resource, 
-            SqlConnection conn)
+            SqlConnection conn,
+            SqlTransaction trans)
         {
             using (HttpClient client = new HttpClient())
             {
@@ -198,7 +215,7 @@ namespace FASTTAPI.Controllers
 
                     if (flightAwareResponse != null)
                     {
-                        InsertFlights(flightAwareResponse, conn);
+                        InsertFlights(flightAwareResponse, conn, trans);
                     }
 
                     cursor = flightAwareResponse?.links?.next;
@@ -207,7 +224,7 @@ namespace FASTTAPI.Controllers
             }
         }
 
-        private void InsertFlights(FlightAwareAirportFlightsResponseObject flightAwareResponse, SqlConnection conn)
+        private void InsertFlights(FlightAwareAirportFlightsResponseObject flightAwareResponse, SqlConnection conn, SqlTransaction trans)
         {
             if (flightAwareResponse.arrivals != null)
             {
@@ -228,11 +245,11 @@ namespace FASTTAPI.Controllers
                         DateTimeCreated = DateTime.UtcNow
                     };
 
-                    var pk  = _flightSqlRepository.InsertFlight(flight, conn);
+                    var pk  = _flightSqlRepository.InsertFlight(flight, conn, trans);
                     
                     foreach (var codesharePartner in arrival.codeshares_iata)
                     {
-                        _flightSqlRepository.InsertCodesharePartner(conn, pk, codesharePartner);
+                        _flightCodesharePartnerSqlRepository.InsertCodesharePartner(conn, trans, pk, codesharePartner);
                     }
                 }
             }
@@ -257,11 +274,11 @@ namespace FASTTAPI.Controllers
                         DateTimeCreated = DateTime.UtcNow
                     };
 
-                    var pk = _flightSqlRepository.InsertFlight(flight, conn);
+                    var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);
 
                     foreach (var codesharePartner in arrival.codeshares_iata)
                     {
-                        _flightSqlRepository.InsertCodesharePartner(conn, pk, codesharePartner);
+                        _flightCodesharePartnerSqlRepository.InsertCodesharePartner(conn, trans, pk, codesharePartner);
                     }
                 }
             }
@@ -285,11 +302,11 @@ namespace FASTTAPI.Controllers
                         DateTimeCreated = DateTime.UtcNow
                     };
 
-                    var pk = _flightSqlRepository.InsertFlight(flight, conn);
+                    var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);
 
                     foreach (var codesharePartner in departure.codeshares_iata)
                     {
-                        _flightSqlRepository.InsertCodesharePartner(conn, pk, codesharePartner);
+                        _flightCodesharePartnerSqlRepository.InsertCodesharePartner(conn, trans, pk, codesharePartner);
                     }
                 }
             }
@@ -313,11 +330,11 @@ namespace FASTTAPI.Controllers
                         DateTimeCreated = DateTime.UtcNow
                     };
 
-                    var pk = _flightSqlRepository.InsertFlight(flight, conn);
+                    var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);
 
                     foreach (var codesharePartner in departure.codeshares_iata)
                     {
-                        _flightSqlRepository.InsertCodesharePartner(conn, pk, codesharePartner);
+                        _flightCodesharePartnerSqlRepository.InsertCodesharePartner(conn, trans, pk, codesharePartner);
                     }
                 }
             }
