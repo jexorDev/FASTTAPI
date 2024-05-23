@@ -12,6 +12,7 @@ namespace FASTTAPI.Utility
                 _sqlConnectionStringBuilder = new SqlConnectionStringBuilder();
 
                 _sqlConnectionStringBuilder.Encrypt = true;
+                _sqlConnectionStringBuilder.ConnectTimeout = 240;
 
                 _sqlConnectionStringBuilder.DataSource = config["FASTTDatabaseConnection_Server"];
                 _sqlConnectionStringBuilder.UserID = config["FASTTDatabaseConnection_Username"];
