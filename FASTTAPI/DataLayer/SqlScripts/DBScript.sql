@@ -1,4 +1,4 @@
-﻿USE [FASTTAPI]
+﻿USE [FASTTAPI]	
 GO
 
 SET ANSI_NULLS ON
@@ -28,6 +28,7 @@ BEGIN
 		[DateTimeUpdated]   DATETIME      NULL
 	);
 END
+GO; 
 
 IF NOT EXISTS (SELECT * 
                FROM INFORMATION_SCHEMA.TABLES 
@@ -41,4 +42,31 @@ BEGIN
 		CONSTRAINT FK_Flights_PK FOREIGN KEY (FlightPK) REFERENCES dbo.Flights (PK)
 	);
 END
+GO;
 
+IF NOT EXISTS(SELECT 1 FROM sys.columns 
+			  WHERE Name = N'IsStale'
+              AND Object_ID = Object_ID(N'dbo.Flights'))
+BEGIN
+    ALTER TABLE [dbo].[Flights]
+	ADD IsStale BIT NOT NULL CONSTRAINT DF_Flights_IsStale DEFAULT(0) 
+END
+GO;
+
+IF NOT EXISTS(SELECT 1 FROM sys.columns 
+			  WHERE Name = N'IsStale'
+			  AND Object_ID = Object_ID(N'dbo.Flights'))
+BEGIN
+    ALTER TABLE [dbo].[Flights]
+	ADD IsStale BIT NOT NULL CONSTRAINT DF_Flights_IsStale DEFAULT(0) 
+END
+GO;
+
+IF NOT EXISTS (SELECT * 
+               FROM SYS.INDEXES
+               WHERE NAME = 'IX_Flights_DateTimeScheduled' 
+               AND  OBJECT_ID = OBJECT_ID('Flights'))
+BEGIN			   
+	CREATE NONCLUSTERED INDEX [IX_Flights_DateTimeScheduled]
+		ON [dbo].[Flights]([DateTimeScheduled] ASC);
+END

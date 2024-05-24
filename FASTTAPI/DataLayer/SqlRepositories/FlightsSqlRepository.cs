@@ -39,7 +39,7 @@ FROM Flights
             {
                 command.Parameters.AddWithValue("@FromDate",fromDate);
                 command.Parameters.AddWithValue("@ToDate", toDate);
-                filterString = "WHERE DateTimeScheduled BETWEEN @FromDate AND @ToDate ";
+                filterString = "WHERE DateTimeScheduled BETWEEN @FromDate AND @ToDate AND IsStale = 0 ";
 
                 if (Disposition.Type.ScheduledArriving.Equals(disposition) || Disposition.Type.Arrived.Equals(disposition))
                 {
@@ -134,6 +134,15 @@ FROM Flights
         public int InsertFlight(Flight flight, SqlConnection conn, SqlTransaction trans)
         {
             string sql = @"
+UPDATE FLIGHTS
+ SET IsStale = 1
+WHERE 
+ FlightNumber = @FlightNumber
+AND 
+ Airline = @Airline
+AND
+ CAST(DateTimeScheduled AS DATE) = CAST(@DateTimeScheduled AS DATE);
+
 INSERT INTO Flights 
 (
  Disposition

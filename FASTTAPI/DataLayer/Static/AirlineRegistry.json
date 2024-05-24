@@ -86,7 +86,7 @@
   {
     "name": "FRONTIER",
     "iata_code": "F9",
-    "icao_code": "FF9",
+    "icao_code": "FFT",
     "ticket_counter_opens_hours_prior_departure": "2",
     "ticket_counter_closes_hours_prior_departure": "2",
     "common_problems": [
