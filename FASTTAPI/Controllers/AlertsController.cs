@@ -2,6 +2,7 @@ using FASTTAPI.DataLayer.DataTransferObjects;
 using FASTTAPI.DataLayer.SqlRepositories;
 using FASTTAPI.Enumerations;
 using FASTTAPI.Models;
+using FASTTAPI.Models.Responses.Alerts;
 using FASTTAPI.Utility;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -25,9 +26,9 @@ namespace FASTTAPI.Controllers
         }
 
         [HttpGet]
-        public async Task<List<string>> Get(DateTime fromDateTime, DateTime toDateTime)
+        public async Task<List<AirlineAlertModel>> Get(DateTime fromDateTime, DateTime toDateTime)
         {
-            var alerts = new List<string>();
+            var alerts = new List<AirlineAlertModel>();
             var flights = new List<Flight>();
             var problemAirlines = AirlineRegistry.GetAirlines().Where(airline => airline.CommonProblems != null);
 
@@ -43,11 +44,18 @@ namespace FASTTAPI.Controllers
                 var problemAirline = problemAirlines.FirstOrDefault(x => x.IataCode.Equals(flight.Airline));
                 if (problemAirline == null) continue;
 
-                var airlineName = AirlineRegistry.FindAirline(flight.Airline)?.Name;
-
-                var main = $"{(flight.Disposition ? "ARRIVING" : "DEPARTING")} {airlineName ?? flight.Airline} {flight.FlightNumber} {(flight.Disposition ? "FROM" : "TO")} {flight.CityAirportCode} {flight.CityAirportName} EXPECTED AT {flight.DateTimeEstimated ?? flight.DateTimeScheduled}";
+                var airline = AirlineRegistry.FindAirline(flight.Airline);
                 
-                alerts.Add(main);
+                alerts.Add(new AirlineAlertModel
+                {
+                    Airline = airline?.Name ?? flight.Airline,
+                    AirlineCode = airline?.IcaoCode ?? flight.Airline,
+                    Disposition = flight.Disposition,
+                    FlightNumber = flight.FlightNumber,
+                    CityAirportCode = flight.CityAirportCode,
+                    CityAirportName = flight.CityAirportName,
+                    ExpectedDateTime = (flight.DateTimeEstimated ?? flight.DateTimeScheduled).Value.ToLocalTime() 
+                });
 
             }
 

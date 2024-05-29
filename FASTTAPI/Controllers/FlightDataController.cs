@@ -95,65 +95,57 @@ namespace FASTTAPI.Controllers
         }
 
         [HttpPost]
-        public async Task<string> Populate([FromBody] PostFlightDataBody body)
+        public async Task<string> Populate([FromBody] PostFlightDataBody requestBody)
         {
-            if (string.Compare(body.AdminPassword, _configuration["AdminPassword"].ToString(), false) != 0) return "Invalid password";
+            if (string.Compare(requestBody.AdminPassword, _configuration["AdminPassword"].ToString(), false) != 0) return "Invalid password";
 
             var status = "connecting to database";
 
-            using (SqlConnection connection = new SqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
+            try
             {
-                SqlTransaction transaction = null;
-
-                try
+                using (SqlConnection connection = new SqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
                 {
+                    SqlTransaction transaction = null;
+
                     var needToWait = false;
                     connection.Open();
+                    
 
-                    DateTime fromDateTime = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0).ToUniversalTime();
-                    DateTime toDateTime = fromDateTime.AddHours(24).AddSeconds(-1);                   
-                                        
-                    if (body.ForTomorrow)
-                    {
-                        fromDateTime = fromDateTime.AddDays(1); 
-                        toDateTime = toDateTime.AddDays(1);
-                    }
-
-                    if (body.Arrived)
+                    if (requestBody.Arrived)
                     {
                         status = "populating tables with arrived flights";
                         if (needToWait) Thread.Sleep(60000);                   
                         transaction = connection.BeginTransaction();
-                        await PopulateFlightTable(fromDateTime, toDateTime, "arrivals", connection, transaction);
+                        await PopulateFlightTable(requestBody.FromDateTime, requestBody.ToDateTime, "arrivals", connection, transaction);
                         transaction.Commit();
                         needToWait = true;
                     }
-                    if (body.ScheduledArriving)
+                    if (requestBody.ScheduledArriving)
                     {
                         status = "populating tables with scheduled arriving flights";
                         if (needToWait) Thread.Sleep(60000);
                         transaction = connection.BeginTransaction();
-                        await PopulateFlightTable(fromDateTime, toDateTime, "scheduled_arrivals", connection, transaction);
+                        await PopulateFlightTable(requestBody.FromDateTime, requestBody.ToDateTime, "scheduled_arrivals", connection, transaction);
                         transaction.Commit();
                         needToWait = true;
                     }
-                    if (body.Departed)
+                    if (requestBody.Departed)
                     {
                         status = "populating tables with departed flights";
                         if (needToWait) Thread.Sleep(60000);
                         Thread.Sleep(60000);
                         transaction = connection.BeginTransaction();
-                        await PopulateFlightTable(fromDateTime, toDateTime, "departures", connection, transaction);
+                        await PopulateFlightTable(requestBody.FromDateTime, requestBody.ToDateTime, "departures", connection, transaction);
                         transaction.Commit();
                         needToWait = true;
                     }
-                    if (body.ScheduledArriving)
+                    if (requestBody.ScheduledArriving)
                     {
                         status = "populating tables with scheduled departing flights";
                         if (needToWait) Thread.Sleep(60000);
                         Thread.Sleep(60000);
                         transaction = connection.BeginTransaction();
-                        await PopulateFlightTable(fromDateTime, toDateTime, "scheduled_departures", connection, transaction);
+                        await PopulateFlightTable(requestBody.FromDateTime, requestBody.ToDateTime, "scheduled_departures", connection, transaction);
                         transaction.Commit();
                         needToWait = true;
                     }
@@ -161,15 +153,11 @@ namespace FASTTAPI.Controllers
                     status = "Successfully completed populating tables";
 
                 }
-                catch (Exception ex)
-                {
-                    if (transaction != null) transaction.Rollback();
-                    status = $"ERROR while {status}: {ex.Message}";
-                }
-                finally
-                {
-                    connection.Close();
-                }
+            }
+            catch (Exception ex)
+            {
+                status = $"ERROR while {status}: {ex.Message}";
+                _logger.LogError(ex.Message, ex);
             }
 
             return status;
