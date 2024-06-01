@@ -85,6 +85,7 @@ FROM Flights
                 }
 
                 command.CommandText += filterString;
+                command.CommandText += " ORDER BY DateTimeScheduled ASC ";
 
                 using (SqlDataReader reader = command.ExecuteReader())
                 {
@@ -140,6 +141,8 @@ WHERE
  FlightNumber = @FlightNumber
 AND 
  Airline = @Airline
+AND
+ Disposition = @Disposition
 AND
  CAST(DateTimeScheduled AS DATE) = CAST(@DateTimeScheduled AS DATE);
 

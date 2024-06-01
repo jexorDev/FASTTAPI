@@ -139,7 +139,7 @@ namespace FASTTAPI.Controllers
                         transaction.Commit();
                         needToWait = true;
                     }
-                    if (requestBody.ScheduledArriving)
+                    if (requestBody.ScheduledDeparting)
                     {
                         status = "populating tables with scheduled departing flights";
                         if (needToWait) Thread.Sleep(60000);
