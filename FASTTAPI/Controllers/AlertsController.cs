@@ -1,11 +1,10 @@
 using FASTTAPI.DataLayer.DataTransferObjects;
-using FASTTAPI.DataLayer.SqlRepositories;
+using FASTTAPI.DataLayer.PostgresSqlRepositories;
 using FASTTAPI.Enumerations;
-using FASTTAPI.Models;
 using FASTTAPI.Models.Responses.Alerts;
 using FASTTAPI.Utility;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 
 namespace FASTTAPI.Controllers
 {
@@ -16,13 +15,13 @@ namespace FASTTAPI.Controllers
         
         private readonly IConfiguration _configuration;
         private readonly ILogger<AirportFlightsController> _logger;
-        private readonly FlightsSqlRepository _flightSqlRepository;
+        private readonly FlightsPostgresSqlRepository _flightSqlRepository;
 
         public AlertsController(ILogger<AirportFlightsController> logger, IConfiguration config)
         {
             _configuration = config;
             _logger = logger;
-            _flightSqlRepository = new FlightsSqlRepository();
+            _flightSqlRepository = new FlightsPostgresSqlRepository();
         }
 
         [HttpGet]
@@ -32,7 +31,7 @@ namespace FASTTAPI.Controllers
             var flights = new List<Flight>();
             var problemAirlines = AirlineRegistry.GetAirlines().Where(airline => airline.CommonProblems != null);
 
-            using (SqlConnection connection = new SqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
+            using (var connection = new NpgsqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
             {
                 connection.Open();
                 flights = _flightSqlRepository.GetFlights(connection, Disposition.Type.None, fromDateTime, toDateTime, "", "", "", false);

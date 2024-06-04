@@ -1,12 +1,12 @@
 using FASTTAPI.DataLayer.DataTransferObjects;
-using FASTTAPI.DataLayer.SqlRepositories;
+using FASTTAPI.DataLayer.PostgresSqlRepositories;
 using FASTTAPI.Enumerations;
 using FASTTAPI.Models;
 using FASTTAPI.Models.FlightAware;
 using FASTTAPI.Utility;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 using Newtonsoft.Json;
+using Npgsql;
 
 namespace FASTTAPI.Controllers
 {
@@ -16,15 +16,17 @@ namespace FASTTAPI.Controllers
     {
         private readonly IConfiguration _configuration;
         private readonly ILogger<FlightDataController> _logger;
-        private readonly FlightsSqlRepository _flightSqlRepository;
-        private readonly FlightCodesharePartnerSqlRepository _flightCodesharePartnerSqlRepository;
+        private readonly FlightsPostgresSqlRepository _flightSqlRepository;
+        private readonly FlightCodesharePartnersPostgresSqlRepository _flightCodesharePartnerSqlRepository;
+        private readonly AirportPostgresSqlRepository _airportSqlRepository;
 
         public FlightDataController(ILogger<FlightDataController> logger, IConfiguration config)
         {
             _configuration = config;
             _logger = logger;
-            _flightSqlRepository = new FlightsSqlRepository();
-            _flightCodesharePartnerSqlRepository = new FlightCodesharePartnerSqlRepository();
+            _flightSqlRepository = new FlightsPostgresSqlRepository();
+            _flightCodesharePartnerSqlRepository = new FlightCodesharePartnersPostgresSqlRepository();
+            _airportSqlRepository = new AirportPostgresSqlRepository();
         }
 
         [HttpGet]
@@ -34,6 +36,7 @@ namespace FASTTAPI.Controllers
             var flights = new List<BaseAirportFlightModel>();
 
             var airlineCode = string.Empty;
+            var airportCode = string.Empty;
 
             if (!string.IsNullOrWhiteSpace(airline))
             {
@@ -44,11 +47,17 @@ namespace FASTTAPI.Controllers
                 }
             }
 
-            using (SqlConnection connection = new SqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
+            using (var connection = new NpgsqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
             {
                 connection.Open();
 
-                foreach (var flight in _flightSqlRepository.GetFlights(connection, dispositionType, fromDateTime, toDateTime, flightNumber ?? "", airlineCode, city ?? "", includeCodesharePartners ?? false))
+                if (!string.IsNullOrWhiteSpace(city))
+                {
+                    var airports = _airportSqlRepository.GetAirports(connection);
+                    airportCode = AirportFinder.FindAirport(airports, city)?.Code;
+                }
+
+                foreach (var flight in _flightSqlRepository.GetFlights(connection, dispositionType, fromDateTime, toDateTime, flightNumber ?? "", airlineCode, airportCode ?? "", includeCodesharePartners ?? false))
                 {
                     var codesharePartners = _flightCodesharePartnerSqlRepository.GetCodesharePartners(flight.Pk, connection);
                     var convertedCodesharePartners = codesharePartners.Distinct().Select(partner => AirlineRegistry.FindAirline(partner));
@@ -57,6 +66,7 @@ namespace FASTTAPI.Controllers
                     var flightModel = new BaseAirportFlightModel
                     {
                         FlightNumber = flight.FlightNumber,
+                        Status = flight.Status,
                         CodesharePartners = convertedCodesharePartners.Where(partner => partner != null).Select(partner => partner.Name).ToList(),
                         AirportGate = flight.Gate,
                         ScheduledArrivalTime = flight.DateTimeScheduled,
@@ -103,9 +113,9 @@ namespace FASTTAPI.Controllers
 
             try
             {
-                using (SqlConnection connection = new SqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
+                using (var connection = new NpgsqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
                 {
-                    SqlTransaction transaction = null;
+                    NpgsqlTransaction transaction = null;
 
                     var needToWait = false;
                     connection.Open();
@@ -167,8 +177,8 @@ namespace FASTTAPI.Controllers
             DateTime fromDateTime, 
             DateTime toDateTime, 
             string resource, 
-            SqlConnection conn,
-            SqlTransaction trans)
+            NpgsqlConnection conn,
+            NpgsqlTransaction trans)
         {
             using (HttpClient client = new HttpClient())
             {
@@ -212,16 +222,31 @@ namespace FASTTAPI.Controllers
             }
         }
 
-        private void InsertFlights(FlightAwareAirportFlightsResponseObject flightAwareResponse, SqlConnection conn, SqlTransaction trans)
+        private void InsertFlights(FlightAwareAirportFlightsResponseObject flightAwareResponse, NpgsqlConnection conn, NpgsqlTransaction trans)
         {
+            var airports = _airportSqlRepository.GetAirports(conn);
+
             if (flightAwareResponse.arrivals != null)
             {
                 foreach (var arrival in flightAwareResponse.arrivals)
                 {
+                    if (airports.Find(airport => string.Compare(airport.Code, arrival.origin.code_iata) == 0) == null)
+                    {
+                        var airport = new Airport
+                        {
+                            Code = arrival.origin.code_iata,
+                            Name = arrival.origin.name,
+                            CityName = arrival.origin.city
+                        };
+                        _airportSqlRepository.InsertAirport(conn, trans, airport);
+                        airports.Add(airport);
+                    }
+
                     var flight = new Flight
                     {
                         Disposition = true,
                         FlightNumber = arrival.flight_number,
+                        Status = arrival.status,
                         Airline = arrival.operator_iata,
                         DateTimeScheduled = arrival.scheduled_in,
                         DateTimeEstimated = arrival.estimated_in,
@@ -230,7 +255,8 @@ namespace FASTTAPI.Controllers
                         CityName = arrival.origin.city,
                         CityAirportCode = arrival.origin.code_iata,
                         CityAirportName = arrival.origin.name,
-                        DateTimeCreated = DateTime.UtcNow
+                        DateTimeCreated = DateTime.UtcNow,
+                        HasCodesharePartners = arrival.codeshares_iata.Any()
                     };
 
                     var pk  = _flightSqlRepository.InsertFlight(flight, conn, trans);
@@ -247,10 +273,23 @@ namespace FASTTAPI.Controllers
             {
                 foreach (var arrival in flightAwareResponse.scheduled_arrivals)
                 {
+                    if (airports.Find(airport => string.Compare(airport.Code, arrival.origin.code_iata) == 0) == null)
+                    {
+                        var airport = new Airport
+                        {
+                            Code = arrival.origin.code_iata,
+                            Name = arrival.origin.name,
+                            CityName = arrival.origin.city
+                        };
+                        _airportSqlRepository.InsertAirport(conn, trans, airport);
+                        airports.Add(airport);
+                    }
+
                     var flight = new Flight
                     {
                         Disposition = true,
                         FlightNumber = arrival.flight_number,
+                        Status = arrival.status,
                         Airline = arrival.operator_iata,
                         DateTimeScheduled = arrival.scheduled_in,
                         DateTimeEstimated = arrival.estimated_in,
@@ -259,7 +298,8 @@ namespace FASTTAPI.Controllers
                         CityName = arrival.origin.city,
                         CityAirportCode = arrival.origin.code_iata,
                         CityAirportName = arrival.origin.name,
-                        DateTimeCreated = DateTime.UtcNow
+                        DateTimeCreated = DateTime.UtcNow,
+                        HasCodesharePartners = arrival.codeshares_iata.Any()
                     };
 
                     var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);
@@ -275,10 +315,23 @@ namespace FASTTAPI.Controllers
             {
                 foreach (var departure in flightAwareResponse.departures)
                 {
+                    if (airports.Find(airport => string.Compare(airport.Code, departure.destination.code_iata) == 0) == null)
+                    {
+                        var airport = new Airport
+                        {
+                            Code = departure.destination.code_iata,
+                            Name = departure.destination.name,
+                            CityName = departure.destination.city
+                        };
+                        _airportSqlRepository.InsertAirport(conn, trans, airport);
+                        airports.Add(airport);
+                    }
+
                     var flight = new Flight
                     {
                         Disposition = false,
                         FlightNumber = departure.flight_number,
+                        Status = departure.status,
                         Airline = departure.operator_iata,
                         DateTimeScheduled = departure.scheduled_out,
                         DateTimeEstimated = departure.estimated_out,
@@ -287,7 +340,8 @@ namespace FASTTAPI.Controllers
                         CityName = departure.destination.city,
                         CityAirportCode = departure.destination.code_iata,
                         CityAirportName = departure.destination.name,
-                        DateTimeCreated = DateTime.UtcNow
+                        DateTimeCreated = DateTime.UtcNow,
+                        HasCodesharePartners = departure.codeshares_iata.Any()
                     };
 
                     var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);
@@ -303,10 +357,24 @@ namespace FASTTAPI.Controllers
             {
                 foreach (var departure in flightAwareResponse.scheduled_departures)
                 {
+                    if (airports.Find(airport => string.Compare(airport.Code, departure.destination.code_iata) == 0) == null)
+                    {
+                        var airport = new Airport
+                        {
+                            Code = departure.destination.code_iata,
+                            Name = departure.destination.name,
+                            CityName = departure.destination.city
+                        };
+                        _airportSqlRepository.InsertAirport(conn, trans, airport);
+                        airports.Add(airport);
+                      
+                    }
+
                     var flight = new Flight
                     {
                         Disposition = false,
                         FlightNumber = departure.flight_number,
+                        Status = departure.status,
                         Airline = departure.operator_iata,
                         DateTimeScheduled = departure.scheduled_out,
                         DateTimeEstimated = departure.estimated_out,
@@ -315,7 +383,8 @@ namespace FASTTAPI.Controllers
                         CityName = departure.destination?.city ?? "",
                         CityAirportCode = departure.destination?.code_iata ?? "",
                         CityAirportName = departure.destination?.name ?? "",
-                        DateTimeCreated = DateTime.UtcNow
+                        DateTimeCreated = DateTime.UtcNow,
+                        HasCodesharePartners = departure.codeshares_iata.Any()
                     };
 
                     var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);
