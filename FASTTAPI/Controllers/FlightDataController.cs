@@ -230,6 +230,8 @@ namespace FASTTAPI.Controllers
             {
                 foreach (var arrival in flightAwareResponse.arrivals)
                 {
+                    if (arrival.origin.code_iata == null) continue;
+
                     if (airports.Find(airport => string.Compare(airport.Code, arrival.origin.code_iata) == 0) == null)
                     {
                         var airport = new Airport
@@ -252,9 +254,7 @@ namespace FASTTAPI.Controllers
                         DateTimeEstimated = arrival.estimated_in,
                         DateTimeActual = arrival.actual_in,
                         Gate = arrival.gate_destination,
-                        CityName = arrival.origin.city,
                         CityAirportCode = arrival.origin.code_iata,
-                        CityAirportName = arrival.origin.name,
                         DateTimeCreated = DateTime.UtcNow,
                         HasCodesharePartners = arrival.codeshares_iata.Any()
                     };
@@ -273,6 +273,8 @@ namespace FASTTAPI.Controllers
             {
                 foreach (var arrival in flightAwareResponse.scheduled_arrivals)
                 {
+                    if (arrival.origin.code_iata == null) continue;
+
                     if (airports.Find(airport => string.Compare(airport.Code, arrival.origin.code_iata) == 0) == null)
                     {
                         var airport = new Airport
@@ -295,9 +297,7 @@ namespace FASTTAPI.Controllers
                         DateTimeEstimated = arrival.estimated_in,
                         DateTimeActual = arrival.actual_in,
                         Gate = arrival.gate_destination,
-                        CityName = arrival.origin.city,
                         CityAirportCode = arrival.origin.code_iata,
-                        CityAirportName = arrival.origin.name,
                         DateTimeCreated = DateTime.UtcNow,
                         HasCodesharePartners = arrival.codeshares_iata.Any()
                     };
@@ -315,6 +315,8 @@ namespace FASTTAPI.Controllers
             {
                 foreach (var departure in flightAwareResponse.departures)
                 {
+                    if (departure.destination.code_iata == null) continue;
+
                     if (airports.Find(airport => string.Compare(airport.Code, departure.destination.code_iata) == 0) == null)
                     {
                         var airport = new Airport
@@ -337,9 +339,7 @@ namespace FASTTAPI.Controllers
                         DateTimeEstimated = departure.estimated_out,
                         DateTimeActual = departure.actual_out,
                         Gate = departure.gate_origin,
-                        CityName = departure.destination.city,
                         CityAirportCode = departure.destination.code_iata,
-                        CityAirportName = departure.destination.name,
                         DateTimeCreated = DateTime.UtcNow,
                         HasCodesharePartners = departure.codeshares_iata.Any()
                     };
@@ -357,6 +357,8 @@ namespace FASTTAPI.Controllers
             {
                 foreach (var departure in flightAwareResponse.scheduled_departures)
                 {
+                    if (departure.destination.code_iata == null) continue;
+
                     if (airports.Find(airport => string.Compare(airport.Code, departure.destination.code_iata) == 0) == null)
                     {
                         var airport = new Airport
@@ -380,9 +382,7 @@ namespace FASTTAPI.Controllers
                         DateTimeEstimated = departure.estimated_out,
                         DateTimeActual = departure.actual_out,
                         Gate = departure.gate_origin,
-                        CityName = departure.destination?.city ?? "",
-                        CityAirportCode = departure.destination?.code_iata ?? "",
-                        CityAirportName = departure.destination?.name ?? "",
+                        CityAirportCode = departure.destination.code_iata,
                         DateTimeCreated = DateTime.UtcNow,
                         HasCodesharePartners = departure.codeshares_iata.Any()
                     };
