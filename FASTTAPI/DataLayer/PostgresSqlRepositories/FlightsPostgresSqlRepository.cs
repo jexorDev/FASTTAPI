@@ -70,11 +70,10 @@ ON
 
                     if (includeCodesharePartners)
                     {
-                        command.Parameters.AddWithValue("@CodeshareID", airline);
                         filterString += @"
     OR EXISTS (SELECT *
                FROM flight_codeshare_partners
-               WHERE SUBSTRING(flight_codeshare_partners.airline, 1, 2) = @CodeshareID
+               WHERE SUBSTRING(flight_codeshare_partners.codeshare_id, 1, 2) = @airline
                  AND flight_codeshare_partners.flight_pk = flights.pk
               ) ";
 
