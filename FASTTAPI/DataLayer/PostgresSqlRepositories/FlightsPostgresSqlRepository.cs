@@ -31,6 +31,7 @@ SELECT
 ,airport_code
 ,created
 ,stale
+,coalesce(aircraft_type, '') aircraft_type
 ,airports.name as airport_name
 ,airports.city_name as airport_city_name
 FROM flights
@@ -106,7 +107,8 @@ ON
                             CityName = reader["airport_city_name"].ToString(),
                             CityAirportName = reader["airport_name"].ToString(),
                             CityAirportCode = reader["airport_code"].ToString(),
-                            DateTimeCreated = DateTime.Parse(reader["created"].ToString())
+                            DateTimeCreated = DateTime.Parse(reader["created"].ToString()),
+                            AircraftType = reader["aircraft_type"].ToString().Trim(),
                         };
 
                         DateTime parsedTime;
@@ -160,6 +162,7 @@ INSERT INTO flights
 ,airport_code
 ,codeshares
 ,stale
+,aircraft_type
 )
 VALUES
 (
@@ -174,6 +177,7 @@ VALUES
 ,@airport_code
 ,@codeshares
 ,FALSE
+,@aircraft_type
 ) RETURNING pk;
 ";
             using (NpgsqlCommand command = new NpgsqlCommand(sql, conn))
@@ -184,6 +188,7 @@ VALUES
                 command.Parameters.AddWithValue("@airline", flight.Airline ?? "");
                 command.Parameters.AddWithValue("@status", flight.Status);
                 command.Parameters.AddWithValue("@codeshares", flight.HasCodesharePartners);
+                command.Parameters.AddWithValue("@aircraft_type", flight.AircraftType ?? "");
 
                 if (flight.DateTimeScheduled.HasValue)
                 {

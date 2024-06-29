@@ -17,5 +17,6 @@
         public DateTime DateTimeCreated { get; set; }
         public DateTime? DateTimeModified { get; set; }
         public bool HasCodesharePartners { get; set; }
+        public string AircraftType { get; set; }
     }
 }

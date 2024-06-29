@@ -78,7 +78,8 @@ namespace FASTTAPI.Controllers
                         CityName = flight.CityName,
                         CityCode = flight.CityAirportCode,
                         CityAirportName = flight.CityAirportName,
-                        LastUpdated = (flight.DateTimeModified ?? flight.DateTimeCreated).ToLocalTime()
+                        LastUpdated = (flight.DateTimeModified ?? flight.DateTimeCreated).ToLocalTime(),
+                        AircraftType = flight.AircraftType
                     };
 
                     var flightAirline = AirlineRegistry.FindAirline(flight.Airline);
@@ -256,7 +257,8 @@ namespace FASTTAPI.Controllers
                         Gate = arrival.gate_destination,
                         CityAirportCode = arrival.origin.code_iata,
                         DateTimeCreated = DateTime.UtcNow,
-                        HasCodesharePartners = arrival.codeshares_iata.Any()
+                        HasCodesharePartners = arrival.codeshares_iata.Any(),
+                        AircraftType = arrival.aircraft_type
                     };
 
                     var pk  = _flightSqlRepository.InsertFlight(flight, conn, trans);
@@ -299,7 +301,8 @@ namespace FASTTAPI.Controllers
                         Gate = arrival.gate_destination,
                         CityAirportCode = arrival.origin.code_iata,
                         DateTimeCreated = DateTime.UtcNow,
-                        HasCodesharePartners = arrival.codeshares_iata.Any()
+                        HasCodesharePartners = arrival.codeshares_iata.Any(),
+                        AircraftType = arrival.aircraft_type
                     };
 
                     var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);
@@ -341,7 +344,8 @@ namespace FASTTAPI.Controllers
                         Gate = departure.gate_origin,
                         CityAirportCode = departure.destination.code_iata,
                         DateTimeCreated = DateTime.UtcNow,
-                        HasCodesharePartners = departure.codeshares_iata.Any()
+                        HasCodesharePartners = departure.codeshares_iata.Any(),
+                        AircraftType = departure.aircraft_type
                     };
 
                     var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);
@@ -384,7 +388,8 @@ namespace FASTTAPI.Controllers
                         Gate = departure.gate_origin,
                         CityAirportCode = departure.destination.code_iata,
                         DateTimeCreated = DateTime.UtcNow,
-                        HasCodesharePartners = departure.codeshares_iata.Any()
+                        HasCodesharePartners = departure.codeshares_iata.Any(),
+                        AircraftType = departure.aircraft_type
                     };
 
                     var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);

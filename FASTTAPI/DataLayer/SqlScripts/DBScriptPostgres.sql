@@ -30,3 +30,5 @@ CREATE TABLE public.flight_codeshare_partners (
 	codeshare_id varchar(8) NOT NULL
 );
 ALTER TABLE public.flight_codeshare_partners ADD CONSTRAINT flight_codeshare_partners_flights_fk FOREIGN KEY (flight_pk) REFERENCES public.flights(pk);
+
+ALTER TABLE public.flights ADD aircraft_type varchar(10) NULL;
