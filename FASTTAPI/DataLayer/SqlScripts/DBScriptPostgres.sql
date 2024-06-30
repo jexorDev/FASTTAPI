@@ -32,3 +32,18 @@ CREATE TABLE public.flight_codeshare_partners (
 ALTER TABLE public.flight_codeshare_partners ADD CONSTRAINT flight_codeshare_partners_flights_fk FOREIGN KEY (flight_pk) REFERENCES public.flights(pk);
 
 ALTER TABLE public.flights ADD aircraft_type varchar(10) NULL;
+
+CREATE TABLE public.failed_flights (
+	pk bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+	attempt_timestamp timestamp NOT NULL,
+	raw_flight_data text NOT NULL,
+	error text NOT NULL,
+	fixed bool NOT NULL
+);
+
+CREATE TABLE public.airline_flight_pax (
+	airline bpchar(2) NOT NULL,
+	aircraft_type varchar(10) NOT NULL,
+	pax_count int DEFAULT 0 NOT NULL,
+	CONSTRAINT airline_flight_pax_pk PRIMARY KEY (airline,aircraft_type)
+);
