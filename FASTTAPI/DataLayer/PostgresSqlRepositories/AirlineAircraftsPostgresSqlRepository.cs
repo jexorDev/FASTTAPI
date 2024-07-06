@@ -77,6 +77,8 @@ SELECT
     ,pax_count
 FROM
     airline_aircraft
+ORDER BY
+    airline
 ";
             using (NpgsqlCommand command = new NpgsqlCommand(sql, conn))
             {
