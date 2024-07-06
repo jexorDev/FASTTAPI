@@ -42,98 +42,60 @@ GROUP BY
             }
         }
 
-        public int InsertFlight(Flight flight, NpgsqlConnection conn, NpgsqlTransaction trans)
+        public void UpdateAirlineAircraft(AirlineAircraft airlineAircraft, NpgsqlConnection conn, NpgsqlTransaction transaction)
         {
             string sql = @"
-UPDATE flights
- SET stale = true
-WHERE 
- flight_number = @flight_number
-AND 
- airline = @airline
+UPDATE 
+    airline_aircraft
+SET
+    pax_count = @pax_count
+WHERE
+    airline = @airline
 AND
- disposition = @disposition
-AND
- scheduled::DATE = @scheduled::DATE;
+    aircraft_type = @aircraft_type
+";
 
-INSERT INTO flights
-(
- disposition
-,flight_number
-,airline
-,status
-,scheduled
-,estimated
-,actual
-,airport_gate
-,airport_code
-,codeshares
-,stale
-,aircraft_type
-)
-VALUES
-(
- @disposition
-,@flight_number
-,@airline
-,@status
-,@scheduled
-,@estimated
-,@actual
-,@airport_gate
-,@airport_code
-,@codeshares
-,FALSE
-,@aircraft_type
-) RETURNING pk;
+            using (NpgsqlCommand command = new NpgsqlCommand(sql, conn))
+            {
+                command.Transaction = transaction;
+                command.Parameters.AddWithValue("@pax_count", airlineAircraft.SeatCount);
+                command.Parameters.AddWithValue("@airline", airlineAircraft.AirlineId);
+                command.Parameters.AddWithValue("@aircraft_type", airlineAircraft.AircraftType);
+
+                command.ExecuteNonQuery();
+            }
+        }
+
+        public List<AirlineAircraft> GetAirlineAircrafts(NpgsqlConnection conn)
+        {
+            List<AirlineAircraft> airlineAircrafts = new List<AirlineAircraft>();
+
+            string sql = @"
+SELECT
+    airline
+    ,aircraft_type
+    ,pax_count
+FROM
+    airline_aircraft
 ";
             using (NpgsqlCommand command = new NpgsqlCommand(sql, conn))
             {
-                command.Transaction = trans;
-                command.Parameters.AddWithValue("@disposition", flight.Disposition);
-                command.Parameters.AddWithValue("@flight_number", flight.FlightNumber ?? "");
-                command.Parameters.AddWithValue("@airline", flight.Airline ?? "");
-                command.Parameters.AddWithValue("@status", flight.Status);
-                command.Parameters.AddWithValue("@codeshares", flight.HasCodesharePartners);
-                command.Parameters.AddWithValue("@aircraft_type", flight.AircraftType ?? "");
-
-                if (flight.DateTimeScheduled.HasValue)
+                using (var reader = command.ExecuteReader())
                 {
-                    command.Parameters.AddWithValue("@scheduled", flight.DateTimeScheduled.Value);
-
+                    while (reader.Read())
+                    {
+                        airlineAircrafts.Add(new AirlineAircraft
+                        {
+                            AirlineId = reader["airline"].ToString(),
+                            AircraftType = reader["aircraft_type"].ToString(),
+                            SeatCount = int.Parse(reader["pax_count"].ToString())
+                        });
+                    }
                 }
-                else
-                {
-                    command.Parameters.AddWithValue("@scheduled", DBNull.Value);
-
-                }
-
-                if (flight.DateTimeEstimated.HasValue)
-                {
-                    command.Parameters.AddWithValue("@estimated", flight.DateTimeEstimated.Value);
-
-                }
-                else
-                {
-                    command.Parameters.AddWithValue("@estimated", DBNull.Value);
-
-                }
-
-                if (flight.DateTimeActual.HasValue)
-                {
-                    command.Parameters.AddWithValue("@actual", flight.DateTimeActual.Value);
-
-                }
-                else
-                {
-                    command.Parameters.AddWithValue("@actual", DBNull.Value);
-
-                }
-                command.Parameters.AddWithValue("@airport_gate", flight.Gate ?? "");
-                command.Parameters.AddWithValue("@airport_code", flight.CityAirportCode?? "");
-                                
-                return Convert.ToInt32(command.ExecuteScalar());
+                
             }
+
+            return airlineAircrafts;
         }
     }
 }

@@ -41,9 +41,9 @@ CREATE TABLE public.failed_flights (
 	fixed bool NOT NULL
 );
 
-CREATE TABLE public.airline_flight_pax (
+CREATE TABLE public.airline_aircraft (
 	airline bpchar(2) NOT NULL,
 	aircraft_type varchar(10) NOT NULL,
 	pax_count int DEFAULT 0 NOT NULL,
-	CONSTRAINT airline_flight_pax_pk PRIMARY KEY (airline,aircraft_type)
+	CONSTRAINT airline_aircraft_pk PRIMARY KEY (airline,aircraft_type)
 );
