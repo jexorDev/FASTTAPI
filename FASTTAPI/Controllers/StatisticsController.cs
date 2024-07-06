@@ -7,43 +7,29 @@ using Npgsql;
 namespace FASTTAPI.Controllers
 {
     [ApiController]
-    [Route("AirlineAircrafts")]
-    public class AirlineAircraftsController : ControllerBase
+    [Route("Statistics")]
+    public class StatisticsController : ControllerBase
     {
         private readonly IConfiguration _configuration;
-        private readonly AirlineAircraftsPostgresSqlRepository _airlineAircraftPostgresSqlRepository;
+        private readonly StatisticsPostgresSqlRepository _statisticsPostgresSqlRepository;
 
-        public AirlineAircraftsController(IConfiguration config)
+        public StatisticsController(IConfiguration config)
         {
             _configuration = config;
-            _airlineAircraftPostgresSqlRepository = new AirlineAircraftsPostgresSqlRepository();
+            _statisticsPostgresSqlRepository = new StatisticsPostgresSqlRepository();
         }
 
         [HttpGet]
-        public async Task<List<AirlineAircraft>> Get()
+        public async Task<List<PaxVolumeHour>> Get([FromQuery] DateTime fromDateTime, DateTime toDateTime)
         {
             using (var connection = new NpgsqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
             {
                 connection.Open();
-                return _airlineAircraftPostgresSqlRepository.GetAirlineAircrafts(connection);
+                return _statisticsPostgresSqlRepository.GetHourlyPassengerVolume(fromDateTime, toDateTime, connection);
                 connection.Close();
             }
         }
 
-        [HttpPut]
-        public async Task Put([FromBody] AirlineAircraftPutBody body)
-        {
-            using (var connection = new NpgsqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
-            {
-                connection.Open();
-                NpgsqlTransaction trans = connection.BeginTransaction();
-                foreach (var airlineAircraft in body.AirlineAircrafts)
-                {
-                    _airlineAircraftPostgresSqlRepository.UpdateAirlineAircraft(airlineAircraft, connection, trans);
-                }
-                trans.Commit();
-                connection.Close();
-            }
-        }
+       
     }
 }

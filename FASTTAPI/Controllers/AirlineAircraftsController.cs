@@ -7,14 +7,16 @@ using Npgsql;
 namespace FASTTAPI.Controllers
 {
     [ApiController]
-    [Route("Statistics")]
-    public class StatisticsController : ControllerBase
+    [Route("AirlineAircrafts")]
+    public class AirlineAircraftsController : ControllerBase
     {
         private readonly IConfiguration _configuration;
+        private readonly AirlineAircraftsPostgresSqlRepository _airlineAircraftPostgresSqlRepository;
 
-        public StatisticsController(IConfiguration config)
+        public AirlineAircraftsController(IConfiguration config)
         {
             _configuration = config;
+            _airlineAircraftPostgresSqlRepository = new AirlineAircraftsPostgresSqlRepository();
         }
 
         [HttpGet]
@@ -23,12 +25,25 @@ namespace FASTTAPI.Controllers
             using (var connection = new NpgsqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
             {
                 connection.Open();
-                return new List<AirlineAircraft>();
-                //return _airlineAircraftPostgresSqlRepository.GetAirlineAircrafts(connection);
+                return _airlineAircraftPostgresSqlRepository.GetAirlineAircrafts(connection);
                 connection.Close();
             }
         }
 
-       
+        [HttpPut]
+        public async Task Put([FromBody] AirlineAircraftPutBody body)
+        {
+            using (var connection = new NpgsqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
+            {
+                connection.Open();
+                NpgsqlTransaction trans = connection.BeginTransaction();
+                foreach (var airlineAircraft in body.AirlineAircrafts)
+                {
+                    _airlineAircraftPostgresSqlRepository.UpdateAirlineAircraft(airlineAircraft, connection, trans);
+                }
+                trans.Commit();
+                connection.Close();
+            }
+        }
     }
 }
