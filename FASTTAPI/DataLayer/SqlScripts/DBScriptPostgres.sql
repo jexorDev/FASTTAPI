@@ -47,3 +47,22 @@ CREATE TABLE public.airline_aircraft (
 	pax_count int DEFAULT 0 NOT NULL,
 	CONSTRAINT airline_aircraft_pk PRIMARY KEY (airline,aircraft_type)
 );
+
+CREATE TABLE public.airlines (
+	iata_code char(2) NOT NULL,
+	"name" varchar(64) NULL,
+	icao_code char(3) NULL,
+	hide boolean DEFAULT false NOT NULL,
+	CONSTRAINT airlines_pk PRIMARY KEY (iata_code)
+);
+
+insert into airlines 
+(
+	iata_code		
+)
+select distinct 
+	AIRLINE	
+from	
+	flights 
+
+ALTER TABLE public.flights ADD CONSTRAINT flights_airlines_fk FOREIGN KEY (airline) REFERENCES public.airlines(iata_code);

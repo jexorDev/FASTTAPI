@@ -22,7 +22,7 @@ namespace FASTTAPI.DataLayer.PostgresSqlRepositories
 
             string sql = @"
 select
-extract(hour from f.scheduled) hourutc 
+extract(hour from COALESCE(f.actual, f.estimated, f.scheduled)) hourutc 
 ,f.disposition 
 	,count(*) flight_count
 	,sum(aa.pax_count) pax_count
@@ -32,11 +32,11 @@ on
 	f.aircraft_type  = aa.aircraft_type 
 and 	
 	f.airline = aa.airline
-WHERE f.scheduled BETWEEN @FromDate AND @ToDate 
+WHERE COALESCE(f.actual, f.estimated, f.scheduled) BETWEEN @FromDate AND @ToDate 
 and 
 	f.stale = false 
 group by  
-extract(hour from f.scheduled) 
+extract(hour from COALESCE(f.actual, f.estimated, f.scheduled)) 
 ,f.disposition ";
 
             using (NpgsqlCommand command = new NpgsqlCommand(sql, conn))

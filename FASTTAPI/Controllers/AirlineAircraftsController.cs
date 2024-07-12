@@ -45,5 +45,16 @@ namespace FASTTAPI.Controllers
                 connection.Close();
             }
         }
+
+        [HttpPost]
+        public async Task Post()
+        {
+            using (var connection = new NpgsqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
+            {
+                connection.Open();
+                _airlineAircraftPostgresSqlRepository.PopulateFromFlights(connection);
+                connection.Close();
+            }
+        }
     }
 }

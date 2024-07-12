@@ -7,6 +7,7 @@ using FASTTAPI.Utility;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using Npgsql;
+using Airline = FASTTAPI.DataLayer.DataTransferObjects.Airline;
 
 namespace FASTTAPI.Controllers
 {
@@ -19,6 +20,7 @@ namespace FASTTAPI.Controllers
         private readonly FlightsPostgresSqlRepository _flightSqlRepository;
         private readonly FlightCodesharePartnersPostgresSqlRepository _flightCodesharePartnerSqlRepository;
         private readonly AirportPostgresSqlRepository _airportSqlRepository;
+        private readonly AirlinePostgresSqlRepository _airlinePostgresSqlRepository;
 
         public FlightDataController(ILogger<FlightDataController> logger, IConfiguration config)
         {
@@ -27,6 +29,7 @@ namespace FASTTAPI.Controllers
             _flightSqlRepository = new FlightsPostgresSqlRepository();
             _flightCodesharePartnerSqlRepository = new FlightCodesharePartnersPostgresSqlRepository();
             _airportSqlRepository = new AirportPostgresSqlRepository();
+            _airlinePostgresSqlRepository = new AirlinePostgresSqlRepository();
         }
 
         [HttpGet]
@@ -116,8 +119,6 @@ namespace FASTTAPI.Controllers
             {
                 using (var connection = new NpgsqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
                 {
-                    NpgsqlTransaction transaction = null;
-
                     var needToWait = false;
                     connection.Open();
                     
@@ -126,18 +127,14 @@ namespace FASTTAPI.Controllers
                     {
                         status = "populating tables with arrived flights";
                         if (needToWait) Thread.Sleep(60000);                   
-                        transaction = connection.BeginTransaction();
-                        await PopulateFlightTable(requestBody.FromDateTime, requestBody.ToDateTime, "arrivals", connection, transaction);
-                        transaction.Commit();
+                        await PopulateFlightTable(requestBody.FromDateTime, requestBody.ToDateTime, "arrivals", connection);
                         needToWait = true;
                     }
                     if (requestBody.ScheduledArriving)
                     {
                         status = "populating tables with scheduled arriving flights";
                         if (needToWait) Thread.Sleep(60000);
-                        transaction = connection.BeginTransaction();
-                        await PopulateFlightTable(requestBody.FromDateTime, requestBody.ToDateTime, "scheduled_arrivals", connection, transaction);
-                        transaction.Commit();
+                        await PopulateFlightTable(requestBody.FromDateTime, requestBody.ToDateTime, "scheduled_arrivals", connection);
                         needToWait = true;
                     }
                     if (requestBody.Departed)
@@ -145,9 +142,7 @@ namespace FASTTAPI.Controllers
                         status = "populating tables with departed flights";
                         if (needToWait) Thread.Sleep(60000);
                         Thread.Sleep(60000);
-                        transaction = connection.BeginTransaction();
-                        await PopulateFlightTable(requestBody.FromDateTime, requestBody.ToDateTime, "departures", connection, transaction);
-                        transaction.Commit();
+                        await PopulateFlightTable(requestBody.FromDateTime, requestBody.ToDateTime, "departures", connection);
                         needToWait = true;
                     }
                     if (requestBody.ScheduledDeparting)
@@ -155,9 +150,7 @@ namespace FASTTAPI.Controllers
                         status = "populating tables with scheduled departing flights";
                         if (needToWait) Thread.Sleep(60000);
                         Thread.Sleep(60000);
-                        transaction = connection.BeginTransaction();
-                        await PopulateFlightTable(requestBody.FromDateTime, requestBody.ToDateTime, "scheduled_departures", connection, transaction);
-                        transaction.Commit();
+                        await PopulateFlightTable(requestBody.FromDateTime, requestBody.ToDateTime, "scheduled_departures", connection);
                         needToWait = true;
                     }
 
@@ -178,8 +171,7 @@ namespace FASTTAPI.Controllers
             DateTime fromDateTime, 
             DateTime toDateTime, 
             string resource, 
-            NpgsqlConnection conn,
-            NpgsqlTransaction trans)
+            NpgsqlConnection conn)
         {
             using (HttpClient client = new HttpClient())
             {
@@ -214,7 +206,7 @@ namespace FASTTAPI.Controllers
 
                     if (flightAwareResponse != null)
                     {
-                        InsertFlights(flightAwareResponse, conn, trans);
+                        InsertFlights(flightAwareResponse, conn);
                     }
 
                     cursor = flightAwareResponse?.links?.next;
@@ -223,9 +215,41 @@ namespace FASTTAPI.Controllers
             }
         }
 
-        private void InsertFlights(FlightAwareAirportFlightsResponseObject flightAwareResponse, NpgsqlConnection conn, NpgsqlTransaction trans)
+        private void InsertFlight(ref List<Airport> airports, ref List<Airline> airlines, Airport airport, Flight flight, List<string> codesharePartners, NpgsqlConnection conn, NpgsqlTransaction trans)
+        {
+            if (airports.Find(airport => string.Compare(airport.Code, flight.CityAirportCode) == 0) == null)
+            {
+                _airportSqlRepository.InsertAirport(conn, trans, airport);
+                airports.Add(airport);
+            }
+
+            if (airlines.Find(airline => string.Compare(airline.IataCode, flight.Airline) == 0) == null)
+            {
+                var airline = new Airline
+                {
+                    IataCode = flight.Airline,
+                    IcaoCode = String.Empty,
+                    Name = String.Empty,
+                    Hide = false
+                };
+
+                _airlinePostgresSqlRepository.InsertAirline(airline, trans, conn);
+                airlines.Add(airline);
+            }
+
+            var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);
+
+            foreach (var codesharePartner in codesharePartners)
+            {
+                _flightCodesharePartnerSqlRepository.InsertCodesharePartner(conn, trans, pk, codesharePartner);
+            }            
+        }
+
+        private void InsertFlights(FlightAwareAirportFlightsResponseObject flightAwareResponse, NpgsqlConnection conn)
         {
             var airports = _airportSqlRepository.GetAirports(conn);
+            var airlines = _airlinePostgresSqlRepository.GetAirlines(conn);
+            NpgsqlTransaction trans = null;
 
             if (flightAwareResponse.arrivals != null)
             {
@@ -233,17 +257,12 @@ namespace FASTTAPI.Controllers
                 {
                     if (arrival.origin.code_iata == null) continue;
 
-                    if (airports.Find(airport => string.Compare(airport.Code, arrival.origin.code_iata) == 0) == null)
+                    var airport = new Airport
                     {
-                        var airport = new Airport
-                        {
-                            Code = arrival.origin.code_iata,
-                            Name = arrival.origin.name,
-                            CityName = arrival.origin.city
-                        };
-                        _airportSqlRepository.InsertAirport(conn, trans, airport);
-                        airports.Add(airport);
-                    }
+                        Code = arrival.origin.code_iata,
+                        Name = arrival.origin.name,
+                        CityName = arrival.origin.city
+                    };                    
 
                     var flight = new Flight
                     {
@@ -261,12 +280,9 @@ namespace FASTTAPI.Controllers
                         AircraftType = arrival.aircraft_type
                     };
 
-                    var pk  = _flightSqlRepository.InsertFlight(flight, conn, trans);
-                    
-                    foreach (var codesharePartner in arrival.codeshares_iata)
-                    {
-                        _flightCodesharePartnerSqlRepository.InsertCodesharePartner(conn, trans, pk, codesharePartner);
-                    }
+                    trans = conn.BeginTransaction();
+                    InsertFlight(ref airports, ref airlines, airport, flight, arrival.codeshares_iata, conn, trans);
+                    trans.Commit();
                 }
             }
 
@@ -277,17 +293,12 @@ namespace FASTTAPI.Controllers
                 {
                     if (arrival.origin.code_iata == null) continue;
 
-                    if (airports.Find(airport => string.Compare(airport.Code, arrival.origin.code_iata) == 0) == null)
+                    var airport = new Airport
                     {
-                        var airport = new Airport
-                        {
-                            Code = arrival.origin.code_iata,
-                            Name = arrival.origin.name,
-                            CityName = arrival.origin.city
-                        };
-                        _airportSqlRepository.InsertAirport(conn, trans, airport);
-                        airports.Add(airport);
-                    }
+                        Code = arrival.origin.code_iata,
+                        Name = arrival.origin.name,
+                        CityName = arrival.origin.city
+                    };                    
 
                     var flight = new Flight
                     {
@@ -305,12 +316,9 @@ namespace FASTTAPI.Controllers
                         AircraftType = arrival.aircraft_type
                     };
 
-                    var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);
-
-                    foreach (var codesharePartner in arrival.codeshares_iata)
-                    {
-                        _flightCodesharePartnerSqlRepository.InsertCodesharePartner(conn, trans, pk, codesharePartner);
-                    }
+                    trans = conn.BeginTransaction();
+                    InsertFlight(ref airports, ref airlines, airport, flight, arrival.codeshares_iata, conn, trans);
+                    trans.Commit();
                 }
             }
 
@@ -320,17 +328,12 @@ namespace FASTTAPI.Controllers
                 {
                     if (departure.destination.code_iata == null) continue;
 
-                    if (airports.Find(airport => string.Compare(airport.Code, departure.destination.code_iata) == 0) == null)
+                    var airport = new Airport
                     {
-                        var airport = new Airport
-                        {
-                            Code = departure.destination.code_iata,
-                            Name = departure.destination.name,
-                            CityName = departure.destination.city
-                        };
-                        _airportSqlRepository.InsertAirport(conn, trans, airport);
-                        airports.Add(airport);
-                    }
+                        Code = departure.destination.code_iata,
+                        Name = departure.destination.name,
+                        CityName = departure.destination.city
+                    };                    
 
                     var flight = new Flight
                     {
@@ -348,12 +351,9 @@ namespace FASTTAPI.Controllers
                         AircraftType = departure.aircraft_type
                     };
 
-                    var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);
-
-                    foreach (var codesharePartner in departure.codeshares_iata)
-                    {
-                        _flightCodesharePartnerSqlRepository.InsertCodesharePartner(conn, trans, pk, codesharePartner);
-                    }
+                    trans = conn.BeginTransaction();
+                    InsertFlight(ref airports, ref airlines, airport, flight, departure.codeshares_iata, conn, trans);
+                    trans.Commit();
                 }
             }
 
@@ -363,18 +363,12 @@ namespace FASTTAPI.Controllers
                 {
                     if (departure.destination.code_iata == null) continue;
 
-                    if (airports.Find(airport => string.Compare(airport.Code, departure.destination.code_iata) == 0) == null)
+                    var airport = new Airport
                     {
-                        var airport = new Airport
-                        {
-                            Code = departure.destination.code_iata,
-                            Name = departure.destination.name,
-                            CityName = departure.destination.city
-                        };
-                        _airportSqlRepository.InsertAirport(conn, trans, airport);
-                        airports.Add(airport);
-                      
-                    }
+                        Code = departure.destination.code_iata,
+                        Name = departure.destination.name,
+                        CityName = departure.destination.city
+                    };
 
                     var flight = new Flight
                     {
@@ -392,12 +386,9 @@ namespace FASTTAPI.Controllers
                         AircraftType = departure.aircraft_type
                     };
 
-                    var pk = _flightSqlRepository.InsertFlight(flight, conn, trans);
-
-                    foreach (var codesharePartner in departure.codeshares_iata)
-                    {
-                        _flightCodesharePartnerSqlRepository.InsertCodesharePartner(conn, trans, pk, codesharePartner);
-                    }
+                    trans = conn.BeginTransaction();
+                    InsertFlight(ref airports, ref airlines, airport, flight, departure.codeshares_iata, conn, trans);
+                    trans.Commit();
                 }
             }
         }
