@@ -23,6 +23,8 @@ SELECT
 ,disposition
 ,flight_number
 ,airline
+,airlines.name airline_name
+,airlines.icao_code airline_icao_code
 ,status
 ,scheduled
 ,estimated
@@ -35,6 +37,10 @@ SELECT
 ,airports.name as airport_name
 ,airports.city_name as airport_city_name
 FROM flights
+INNER JOIN 
+    airlines
+ON
+    airlines.iata_code = flights.airline
 LEFT OUTER JOIN 
  airports
 ON
@@ -103,6 +109,8 @@ ON
                             FlightNumber = reader["flight_number"].ToString().Trim(),
                             Status = reader["status"].ToString().Trim(),
                             Airline = reader["airline"].ToString().Trim(),
+                            AirlineIcaoCode = reader["airline_icao_code"].ToString().Trim(),
+                            AirlineName = reader["airline_name"].ToString().Trim(),
                             Gate = reader["airport_gate"].ToString(),
                             CityName = reader["airport_city_name"].ToString(),
                             CityAirportName = reader["airport_name"].ToString(),

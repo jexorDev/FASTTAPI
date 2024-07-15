@@ -14,10 +14,12 @@ INSERT INTO
 (
     airline
     ,aircraft_type
+    ,pax_count
 )
 SELECT 
     f.airline
     ,f.aircraft_type
+    ,1
 FROM
     flights f
 WHERE 

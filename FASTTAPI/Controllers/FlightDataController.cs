@@ -20,7 +20,8 @@ namespace FASTTAPI.Controllers
         private readonly FlightsPostgresSqlRepository _flightSqlRepository;
         private readonly FlightCodesharePartnersPostgresSqlRepository _flightCodesharePartnerSqlRepository;
         private readonly AirportPostgresSqlRepository _airportSqlRepository;
-        private readonly AirlinePostgresSqlRepository _airlinePostgresSqlRepository;
+        private readonly AirlinePostgresSqlRepository _airlineSqlRepository;
+        private readonly FailedFlightsPostgresSqlRepository _failedFlightsSqlRepository;
 
         public FlightDataController(ILogger<FlightDataController> logger, IConfiguration config)
         {
@@ -29,30 +30,31 @@ namespace FASTTAPI.Controllers
             _flightSqlRepository = new FlightsPostgresSqlRepository();
             _flightCodesharePartnerSqlRepository = new FlightCodesharePartnersPostgresSqlRepository();
             _airportSqlRepository = new AirportPostgresSqlRepository();
-            _airlinePostgresSqlRepository = new AirlinePostgresSqlRepository();
+            _airlineSqlRepository = new AirlinePostgresSqlRepository();
+            _failedFlightsSqlRepository = new FailedFlightsPostgresSqlRepository();
         }
 
         [HttpGet]
         public async Task<List<BaseAirportFlightModel>> Get([FromQuery] Disposition.Type dispositionType, DateTime fromDateTime, DateTime toDateTime, string? flightNumber, string? airline, string? city, bool? includeCodesharePartners)
         {
-            AirlineRegistry.GetAirlines();
-            var flights = new List<BaseAirportFlightModel>();
-
-            var airlineCode = string.Empty;
-            var airportCode = string.Empty;
-
-            if (!string.IsNullOrWhiteSpace(airline))
-            {
-                var convertedAirline = AirlineRegistry.FindAirline(airline);
-                if (convertedAirline != null)
-                {
-                    airlineCode = convertedAirline.IataCode;
-                }
-            }
+            var flights = new List<BaseAirportFlightModel>();          
 
             using (var connection = new NpgsqlConnection(DatabaseConnectionStringBuilder.GetSqlConnectionString(_configuration)))
             {
                 connection.Open();
+
+                var airlineCode = string.Empty;
+                var airportCode = string.Empty;
+
+                if (!string.IsNullOrWhiteSpace(airline))
+                {
+                    var airlines = _airlineSqlRepository.GetAirlines(connection);
+                    var convertedAirline = AirlineFinder.FindAirline(airline, airlines);
+                    if (convertedAirline != null)
+                    {
+                        airlineCode = convertedAirline.IataCode;
+                    }
+                }
 
                 if (!string.IsNullOrWhiteSpace(city))
                 {
@@ -63,14 +65,14 @@ namespace FASTTAPI.Controllers
                 foreach (var flight in _flightSqlRepository.GetFlights(connection, dispositionType, fromDateTime, toDateTime, flightNumber ?? "", airlineCode, airportCode ?? "", includeCodesharePartners ?? false))
                 {
                     var codesharePartners = _flightCodesharePartnerSqlRepository.GetCodesharePartners(flight.Pk, connection);
-                    var convertedCodesharePartners = codesharePartners.Distinct().Select(partner => AirlineRegistry.FindAirline(partner));
 
-                    //TODO: make shared code for this
                     var flightModel = new BaseAirportFlightModel
                     {
                         FlightNumber = flight.FlightNumber,
                         Status = flight.Status,
-                        CodesharePartners = convertedCodesharePartners.Where(partner => partner != null).Select(partner => partner.Name).ToList(),
+                        AirlineName = flight.AirlineName,
+                        AirlineIdentifier = flight.AirlineIcaoCode,
+                        CodesharePartners = codesharePartners.Where(partner => !string.IsNullOrWhiteSpace(partner.AirlineName)).Select(partner => partner.AirlineName).ToList(),
                         AirportGate = flight.Gate,
                         ScheduledArrivalTime = flight.DateTimeScheduled,
                         ScheduledDepartureTime = flight.DateTimeScheduled,
@@ -83,20 +85,7 @@ namespace FASTTAPI.Controllers
                         CityAirportName = flight.CityAirportName,
                         LastUpdated = (flight.DateTimeModified ?? flight.DateTimeCreated).ToLocalTime(),
                         AircraftType = flight.AircraftType
-                    };
-
-                    var flightAirline = AirlineRegistry.FindAirline(flight.Airline);
-
-                    if (flightAirline != null)
-                    {
-                        flightModel.AirlineName = flightAirline.Name;
-                        flightModel.AirlineIdentifier = flightAirline.IcaoCode;
-                    }
-                    else
-                    {
-                        flightModel.AirlineName = flight.Airline;
-                        flightModel.AirlineIdentifier = flight.Airline;
-                    }
+                    };                  
 
                     flights.Add(flightModel);
 
@@ -233,7 +222,7 @@ namespace FASTTAPI.Controllers
                     Hide = false
                 };
 
-                _airlinePostgresSqlRepository.InsertAirline(airline, trans, conn);
+                _airlineSqlRepository.InsertAirline(airline, trans, conn);
                 airlines.Add(airline);
             }
 
@@ -242,13 +231,13 @@ namespace FASTTAPI.Controllers
             foreach (var codesharePartner in codesharePartners)
             {
                 _flightCodesharePartnerSqlRepository.InsertCodesharePartner(conn, trans, pk, codesharePartner);
-            }            
+            }
         }
 
         private void InsertFlights(FlightAwareAirportFlightsResponseObject flightAwareResponse, NpgsqlConnection conn)
         {
             var airports = _airportSqlRepository.GetAirports(conn);
-            var airlines = _airlinePostgresSqlRepository.GetAirlines(conn);
+            var airlines = _airlineSqlRepository.GetAirlines(conn);
             NpgsqlTransaction trans = null;
 
             if (flightAwareResponse.arrivals != null)
@@ -281,8 +270,25 @@ namespace FASTTAPI.Controllers
                     };
 
                     trans = conn.BeginTransaction();
-                    InsertFlight(ref airports, ref airlines, airport, flight, arrival.codeshares_iata, conn, trans);
-                    trans.Commit();
+
+                    try
+                    {
+                        InsertFlight(ref airports, ref airlines, airport, flight, arrival.codeshares_iata, conn, trans);
+                        trans.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        trans.Rollback();
+                        try
+                        {
+                            _failedFlightsSqlRepository.InsertFailedFlight(JsonConvert.SerializeObject(arrival), ex.Message, conn);
+                        }
+                        catch { }
+                    }
+                    finally
+                    {
+                        trans.Dispose();
+                    }
                 }
             }
 
@@ -317,8 +323,25 @@ namespace FASTTAPI.Controllers
                     };
 
                     trans = conn.BeginTransaction();
-                    InsertFlight(ref airports, ref airlines, airport, flight, arrival.codeshares_iata, conn, trans);
-                    trans.Commit();
+
+                    try
+                    {
+                        InsertFlight(ref airports, ref airlines, airport, flight, arrival.codeshares_iata, conn, trans);
+                        trans.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        trans.Rollback();
+                        try
+                        {
+                            _failedFlightsSqlRepository.InsertFailedFlight(JsonConvert.SerializeObject(arrival), ex.Message, conn);
+                        }
+                        catch { }
+                    }
+                    finally
+                    {
+                        trans.Dispose();
+                    }
                 }
             }
 
@@ -349,11 +372,28 @@ namespace FASTTAPI.Controllers
                         DateTimeCreated = DateTime.UtcNow,
                         HasCodesharePartners = departure.codeshares_iata.Any(),
                         AircraftType = departure.aircraft_type
-                    };
+                    };                    
 
                     trans = conn.BeginTransaction();
-                    InsertFlight(ref airports, ref airlines, airport, flight, departure.codeshares_iata, conn, trans);
-                    trans.Commit();
+
+                    try
+                    {
+                        InsertFlight(ref airports, ref airlines, airport, flight, departure.codeshares_iata, conn, trans);
+                        trans.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        trans.Rollback();
+                        try
+                        {
+                            _failedFlightsSqlRepository.InsertFailedFlight(JsonConvert.SerializeObject(departure), ex.Message, conn);
+                        }
+                        catch { }
+                    }
+                    finally
+                    {
+                        trans.Dispose();
+                    }
                 }
             }
 
@@ -387,8 +427,25 @@ namespace FASTTAPI.Controllers
                     };
 
                     trans = conn.BeginTransaction();
-                    InsertFlight(ref airports, ref airlines, airport, flight, departure.codeshares_iata, conn, trans);
-                    trans.Commit();
+
+                    try
+                    {
+                        InsertFlight(ref airports, ref airlines, airport, flight, departure.codeshares_iata, conn, trans);
+                        trans.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        trans.Rollback();
+                        try
+                        {
+                            _failedFlightsSqlRepository.InsertFailedFlight(JsonConvert.SerializeObject(departure), ex.Message, conn);
+                        }
+                        catch { }
+                    }
+                    finally
+                    {
+                        trans.Dispose();
+                    }
                 }
             }
         }

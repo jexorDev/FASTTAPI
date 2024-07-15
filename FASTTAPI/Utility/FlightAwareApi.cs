@@ -1,4 +1,6 @@
-﻿namespace FASTTAPI.Utility
+﻿using FASTTAPI.DataLayer.DataTransferObjects;
+
+namespace FASTTAPI.Utility
 {
     public class FlightAwareApi
     {
@@ -28,23 +30,23 @@
 
         }
 
-        public static string GetAirlineWithCodesharePartners(string airline, List<string> codesharePartners)
+        public static string GetAirlineWithCodesharePartners(string airline, List<Airline> airlines, List<string> codesharePartners)
         {
             try
             {
-                var convertedAirline = AirlineRegistry.FindAirline(airline)?.Name;
+                var convertedAirline = AirlineFinder.FindAirline(airline, airlines)?.Name;
                 var convertedCodesharePartners = new List<string>();
 
                 foreach (var codeshareParter in codesharePartners)
                 {
-                    var convertedCodesharePartner = AirlineRegistry.FindAirline(codeshareParter)?.Name;
+                    var convertedCodesharePartner = AirlineFinder.FindAirline(codeshareParter, airlines)?.Name;
                     if (!string.IsNullOrWhiteSpace(convertedCodesharePartner))
                     {
                         convertedCodesharePartners.Add(convertedCodesharePartner);
                     }
                 }
 
-                return String.Join(" | ", new List<string>() { convertedAirline ?? "" }.Concat(convertedCodesharePartners));
+                return String.Join("|", new List<string>() { convertedAirline ?? "" }.Concat(convertedCodesharePartners));
 
             }
             catch

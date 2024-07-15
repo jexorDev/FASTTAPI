@@ -1,16 +1,22 @@
-﻿using Npgsql;
+﻿using FASTTAPI.DataLayer.DataTransferObjects;
+using Npgsql;
 
 namespace FASTTAPI.DataLayer.PostgresSqlRepositories
 {
     public class FlightCodesharePartnersPostgresSqlRepository
     {
-        public List<string> GetCodesharePartners(int flightPk, NpgsqlConnection conn)
+        public List<FlightCodesharePartner> GetCodesharePartners(int flightPk, NpgsqlConnection conn)
         {
-            var partners = new List<string>();
+            var partners = new List<FlightCodesharePartner>();
             string sql = @"
 SELECT 
  SUBSTRING(codeshare_id, 1, 2) AS CodeshareID
+,airlines.name airline_name
 FROM flight_codeshare_partners
+LEFT OUTER JOIN
+    airlines
+ON
+    airlines.iata_code = SUBSTRING(codeshare_id, 1, 2)
 WHERE flight_pk = @flight_pk
 ";
             using (var command = new NpgsqlCommand(sql, conn))
@@ -21,7 +27,11 @@ WHERE flight_pk = @flight_pk
                 {
                     while (reader.Read())
                     {
-                        partners.Add(reader["CodeshareID"].ToString());
+                        partners.Add(new FlightCodesharePartner
+                        {
+                            AirlineCode = reader["CodeshareID"].ToString(),
+                            AirlineName = reader["airline_name"].ToString()
+                        });
                     }
                 }
             }

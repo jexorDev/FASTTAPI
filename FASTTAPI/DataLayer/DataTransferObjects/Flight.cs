@@ -6,6 +6,8 @@
         public bool Disposition { get; set; }
         public string FlightNumber { get; set; } = string.Empty;
         public string Airline { get; set; } = string.Empty;
+        public string AirlineIcaoCode { get; set; } = string.Empty;
+        public string AirlineName { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public DateTime? DateTimeScheduled { get; set; } 
         public DateTime? DateTimeEstimated { get; set; } 

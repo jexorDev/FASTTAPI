@@ -1,4 +1,5 @@
-﻿using Npgsql;
+﻿using FASTTAPI.DataLayer.DataTransferObjects;
+using Npgsql;
 
 namespace FASTTAPI.DataLayer.PostgresSqlRepositories
 {
@@ -19,7 +20,7 @@ VALUES
  CURRENT_TIMESTAMP
 ,@raw_flight_data
 ,@error
-,0
+,FALSE
 );
 ";
             using (NpgsqlCommand command = new NpgsqlCommand(sql, conn))
@@ -30,5 +31,39 @@ VALUES
                 return command.ExecuteNonQuery();
             }
         }
+
+        public List<FailedFlight> GetFailedFlights(NpgsqlConnection conn)
+        {
+            List<FailedFlight> failedFlights = new List<FailedFlight>();    
+
+            string sql = @"
+SELECT
+    attempt_timestamp
+    ,raw_flight_data
+    ,error
+    ,fixed
+FROM
+    failed_flights
+";
+            using (NpgsqlCommand command = new NpgsqlCommand(sql, conn))
+            {
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        failedFlights.Add(new FailedFlight
+                        {
+                            Timestamp = DateTime.Parse(reader["attempt_timestamp"].ToString()),
+                            SerializedFlightInfo = reader["raw_flight_data"].ToString(),
+                            ErrorMessage = reader["error"].ToString(),
+                            IsFixed = bool.Parse(reader["fixed"].ToString())
+                        });
+                    }
+                }
+            }
+
+            return failedFlights;
+        }
+
     }
 }

@@ -1,31 +1,14 @@
-﻿using FASTTAPI.Models;
-using Newtonsoft.Json;
-using System.Reflection;
+﻿using FASTTAPI.DataLayer.DataTransferObjects;
 
 namespace FASTTAPI.Utility
 {
-    public class AirlineRegistry
+    public class AirlineFinder
     {
-        private static List<Airline> _airlines;
-
-        public static List<Airline> GetAirlines()
-        {
-            if (_airlines == null)
-            {
-                using (StreamReader reader = new StreamReader(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), @"DataLayer\Static\AirlineRegistry.json")))
-                {
-                    _airlines = JsonConvert.DeserializeObject<List<Airline>>(reader.ReadToEnd());
-                }
-            }
-
-            return _airlines ?? new List<Airline>();
-        }
-
-        public static Airline? FindAirline(string keyword)
+        public static Airline? FindAirline(string keyword, List<Airline> airlines)
         {
             keyword = keyword.Trim();
 
-            foreach (Airline airline in GetAirlines())
+            foreach (Airline airline in airlines)
             {
                 if (keyword.Length == 2)
                 {
